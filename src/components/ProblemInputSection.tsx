@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Sparkles, Upload, BookOpen, AlertCircle, ArrowRight, FileText, FileType, Image as ImageIcon, RotateCcw } from 'lucide-react';
+import { Sparkles, Upload, BookOpen, AlertCircle, ArrowRight, FileText, FileType, Image as ImageIcon, RotateCcw, Clipboard } from 'lucide-react';
 import { GradeSelector } from './GradeSelector';
 import { MathSymbolKeyboard } from './MathSymbolKeyboard';
 import { MathView } from './MathView';
@@ -35,6 +35,20 @@ export const ProblemInputSection: React.FC<ProblemInputSectionProps> = ({
 }) => {
   const [showPreview, setShowPreview] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+  const handleTextareaPaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.indexOf('image') !== -1 || items[i].kind === 'file') {
+        // Intercept image paste and open upload modal for automatic math OCR
+        e.preventDefault();
+        onOpenUpload();
+        return;
+      }
+    }
+  };
 
   const handleInsertSymbol = (symbol: string) => {
     if (!textareaRef.current) {
@@ -73,7 +87,7 @@ export const ProblemInputSection: React.FC<ProblemInputSectionProps> = ({
           <div className="flex items-center justify-between">
             <label className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-indigo-600"></span>
-              Nhập đề hoặc tải tệp đề bài:
+              Nhập đề hoặc dán ảnh đề bài (Ctrl + V):
             </label>
             <div className="flex items-center gap-2">
               <button
@@ -91,7 +105,8 @@ export const ProblemInputSection: React.FC<ProblemInputSectionProps> = ({
               ref={textareaRef}
               rows={5}
               disabled={isLoading}
-              placeholder="Ví dụ: Rút gọn biểu thức P = (sqrt(x)/(sqrt(x)+3) + 2*sqrt(x)/(sqrt(x)-3) - (3x+9)/(x-9)) : ((sqrt(x)+1)/(sqrt(x)-3)) với x >= 0, x != 9..."
+              onPaste={handleTextareaPaste}
+              placeholder="Nhập đề bài toán (hoặc bấm Ctrl + V để dán ảnh chụp đề bài trực tiếp)..."
               value={problemText}
               onChange={(e) => onProblemTextChange(e.target.value)}
               className="w-full p-4 rounded-2xl border border-slate-300 focus:border-blue-500 focus:ring-3 focus:ring-blue-100 text-sm font-sans text-slate-800 placeholder-slate-400 focus:outline-none transition-all resize-y min-h-[130px]"
@@ -136,7 +151,7 @@ export const ProblemInputSection: React.FC<ProblemInputSectionProps> = ({
 
         {/* Action Buttons Row */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2">
-          {/* File Upload action */}
+          {/* File Upload Action */}
           <div className="flex items-center gap-2">
             <button
               type="button"
@@ -182,27 +197,21 @@ export const ProblemInputSection: React.FC<ProblemInputSectionProps> = ({
             <button
               type="button"
               onClick={onOpenSamples}
-              className="text-xs font-bold text-indigo-600 hover:text-indigo-800 transition-colors"
+              className="text-xs font-bold text-blue-600 hover:text-blue-800 transition-colors cursor-pointer"
             >
               Xem tất cả bài mẫu →
             </button>
           </div>
-
           <div className="flex flex-wrap gap-2">
             {sampleQuickList.map((sample) => (
               <button
                 key={sample.id}
                 type="button"
+                disabled={isLoading}
                 onClick={() => onSelectSample(sample)}
-                className="text-left text-xs bg-slate-50 hover:bg-blue-50 border border-slate-200 hover:border-blue-300 p-2.5 rounded-xl transition-all group flex items-center gap-2 max-w-full"
+                className="px-3 py-1.5 rounded-xl border border-slate-200 hover:border-blue-400 bg-slate-50 hover:bg-blue-50/50 text-xs text-slate-700 transition-all text-left flex items-center gap-1.5 cursor-pointer active:scale-95"
               >
-                <span className="w-1.5 h-1.5 rounded-full bg-blue-600 shrink-0" />
-                <span className="font-bold text-slate-700 group-hover:text-blue-700 truncate max-w-[200px] sm:max-w-xs">
-                  {sample.title}
-                </span>
-                <span className="text-[10px] bg-blue-100 text-blue-800 font-bold px-1.5 py-0.5 rounded-md shrink-0">
-                  Bài mẫu
-                </span>
+                <span className="font-semibold">{sample.title}</span>
               </button>
             ))}
           </div>

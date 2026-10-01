@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   Upload,
   FileText,
@@ -10,6 +10,7 @@ import {
   AlertCircle,
   Sparkles,
   FileCode,
+  Clipboard,
 } from 'lucide-react';
 import { MathView } from './MathView';
 
@@ -47,13 +48,46 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Countdown timer effect
-  React.useEffect(() => {
+  useEffect(() => {
     if (countdown <= 0) return;
     const timer = setTimeout(() => {
       setCountdown((prev) => prev - 1);
     }, 1000);
     return () => clearTimeout(timer);
   }, [countdown]);
+
+  // Support Ctrl + V (Paste image / file directly from clipboard)
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handlePaste = (e: ClipboardEvent) => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        if (item.type.indexOf('image') !== -1 || item.kind === 'file') {
+          const file = item.getAsFile();
+          if (file) {
+            e.preventDefault();
+            const namedFile =
+              file.name && file.name !== 'image.png'
+                ? file
+                : new File(
+                    [file],
+                    `anh-dan-${new Date().toLocaleTimeString('vi-VN').replace(/:/g, '-')}.png`,
+                    { type: file.type || 'image/png' }
+                  );
+            handleFile(namedFile);
+            return;
+          }
+        }
+      }
+    };
+
+    window.addEventListener('paste', handlePaste);
+    return () => window.removeEventListener('paste', handlePaste);
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -177,7 +211,7 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
             </div>
             <div>
               <h3 className="font-bold text-base leading-tight">Tải đề bài (PDF, Word hoặc Ảnh)</h3>
-              <p className="text-xs text-blue-100">Hỗ trợ nhận diện và trích xuất công thức toán tự động</p>
+              <p className="text-xs text-blue-100">Hỗ trợ nhận diện, dán ảnh (Ctrl + V) và trích xuất công thức toán</p>
             </div>
           </div>
           <button
@@ -192,12 +226,12 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
         <div className="p-5 overflow-y-auto flex-1 space-y-4">
           {!selectedFile ? (
             <div className="space-y-4">
-              {/* Dropzone */}
+              {/* Dropzone with Paste Support */}
               <div
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={handleDrop}
                 onClick={() => fileInputRef.current?.click()}
-                className="border-2 border-dashed border-blue-300 hover:border-blue-600 bg-blue-50/40 hover:bg-blue-50 rounded-3xl p-8 sm:p-10 text-center cursor-pointer transition-all flex flex-col items-center justify-center gap-3 group"
+                className="border-2 border-dashed border-blue-300 hover:border-blue-600 bg-blue-50/40 hover:bg-blue-50 rounded-3xl p-7 sm:p-9 text-center cursor-pointer transition-all flex flex-col items-center justify-center gap-3 group relative"
               >
                 <input
                   ref={fileInputRef}
@@ -211,15 +245,18 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
                 </div>
                 <div>
                   <p className="text-sm sm:text-base font-bold text-slate-800">
-                    Kéo thả tệp đề vào đây hoặc bấm để chọn tệp
+                    Kéo thả tệp đề vào đây, bấm để chọn tệp hoặc nhấn Ctrl + V để dán ảnh
                   </p>
                   <p className="text-xs text-slate-500 mt-1">
                     Hỗ trợ tệp <strong>PDF</strong>, <strong>Word (.docx)</strong>, <strong>Ảnh (.jpg, .png)</strong> hoặc <strong>Văn bản (.txt)</strong>
                   </p>
                 </div>
 
-                {/* Badges of supported filetypes */}
-                <div className="flex flex-wrap items-center justify-center gap-2 pt-2">
+                {/* Badges of supported filetypes & Paste indicator */}
+                <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
+                  <span className="text-[11px] font-bold bg-indigo-100 text-indigo-800 px-2.5 py-1 rounded-lg flex items-center gap-1">
+                    <Clipboard className="w-3.5 h-3.5 text-indigo-600" /> Dán ảnh (Ctrl + V)
+                  </span>
                   <span className="text-[11px] font-bold bg-rose-100 text-rose-800 px-2.5 py-1 rounded-lg flex items-center gap-1">
                     <FileText className="w-3.5 h-3.5" /> PDF
                   </span>
