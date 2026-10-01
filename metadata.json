@@ -1,0 +1,6 @@
+{
+  "name": "GỢI MỞ TỪNG BƯỚC – GIÁO VIÊN AI",
+  "description": "Hiểu đề – Tự suy nghĩ – Giải từng bước. Gia sư AI sư phạm dẫn dắt học sinh K-12 tự giải toán theo phương pháp gợi mở.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

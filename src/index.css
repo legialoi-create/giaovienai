@@ -1,0 +1,49 @@
+@import "tailwindcss";
+
+@layer base {
+  html {
+    font-size: 18.66px; /* 14pt base default */
+    transition: font-size 0.15s ease-out;
+  }
+
+  body {
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    font-size: 1rem;
+    line-height: 1.6;
+    color: #0f172a;
+    -webkit-font-smoothing: antialiased;
+  }
+}
+
+/* Math equation wrapper for responsive projector & mobile display */
+.math-block-container {
+  overflow-x: auto;
+  max-width: 100%;
+  padding: 0.5rem 0;
+  -webkit-overflow-scrolling: touch;
+}
+
+.math-block-container::-webkit-scrollbar {
+  height: 6px;
+}
+
+.math-block-container::-webkit-scrollbar-thumb {
+  background-color: #94a3b8;
+  border-radius: 9999px;
+}
+
+/* KaTeX custom sizing for projector clarity (14pt screen scale) */
+.katex {
+  font-size: 1.2em !important;
+  line-height: 1.4;
+  letter-spacing: 0.01em;
+}
+
+.katex-display {
+  margin: 0.75em 0 !important;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0.35rem 0;
+}
+
+
