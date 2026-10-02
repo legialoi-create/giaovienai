@@ -582,17 +582,31 @@ Hãy chuẩn hóa nội dung đề bài trên dưới dạng JSON chuẩn xác:
 5. isClear: boolean, true nếu đầy đủ.
 6. note: Ghi chú nếu có.`;
     } else {
-      const effectiveMimeType = isPdf ? 'application/pdf' : (mimeType || 'image/jpeg');
+      let effectiveMimeType = 'image/jpeg';
+      const lowerName = (fileName || '').toLowerCase();
+      const lowerMime = (mimeType || '').toLowerCase();
+      if (isPdf || lowerName.endsWith('.pdf') || lowerMime.includes('pdf')) {
+        effectiveMimeType = 'application/pdf';
+      } else if (lowerName.endsWith('.png') || lowerMime.includes('png')) {
+        effectiveMimeType = 'image/png';
+      } else if (lowerName.endsWith('.webp') || lowerMime.includes('webp')) {
+        effectiveMimeType = 'image/webp';
+      } else {
+        effectiveMimeType = 'image/jpeg';
+      }
+
+      const sanitizedBase64 = cleanBase64.replace(/^data:[^;]+;base64,/, '').trim();
+
       promptContents = {
         parts: [
           {
             inlineData: {
               mimeType: effectiveMimeType,
-              data: cleanBase64,
+              data: sanitizedBase64,
             },
           },
           {
-            text: `Bạn là chuyên gia số hóa đề thi và bài tập Toán Việt Nam từ tệp ${isPdf ? 'PDF' : 'Hình ảnh'}.
+            text: `Bạn là chuyên gia số hóa đề thi và bài tập Toán Việt Nam từ tệp ${effectiveMimeType === 'application/pdf' ? 'PDF' : 'Hình ảnh'}.
 Hãy đọc kỹ tài liệu chứa đề toán này và trích xuất thông tin dưới dạng JSON chuẩn xác:
 1. formattedText: Nội dung đề bài đầy đủ, chính xác, định dạng lại các ký hiệu toán học bằng LaTeX chuẩn ($...$ và $$...$$). Nếu có nhiều câu (a, b, c...) hãy giữ nguyên cấu trúc rõ ràng.
 2. estimatedGrade: Dự đoán lớp học phù hợp (số nguyên từ 1 đến 12).${gradeHint ? ` Người dùng đang chọn lớp ${gradeHint}, hãy tham khảo.` : ''}
@@ -650,12 +664,16 @@ Hãy đọc kỹ tài liệu chứa đề toán này và trích xuất thông ti
         topic: 'algebra',
         topicLabel: 'Trích xuất từ tệp Word (.docx)',
         isClear: true,
-        note: 'Đã trích xuất trực tiếp văn bản từ tệp Word. Bạn có thể kiểm tra và sửa lại trước khi bắt đầu học.',
+        note: 'Đã trích xuất trực tiếp văn bản từ tệp Word.',
       });
     }
 
     const errInfo = formatErrorMessage(error);
-    res.status(errInfo.isRateLimit ? 429 : 500).json(errInfo);
+    res.status(errInfo.isRateLimit ? 429 : 400).json({
+      error: errInfo.error || 'Không thể trích xuất đề toán từ ảnh chụp. Vui lòng chụp lại ảnh rõ nét hơn.',
+      isRateLimit: errInfo.isRateLimit,
+      retryDelay: errInfo.retryDelay,
+    });
   }
 });
 
