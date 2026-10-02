@@ -137,14 +137,18 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
     playShutterSound();
 
     const canvas = canvasRef.current || document.createElement('canvas');
-    canvas.width = video.videoWidth || 1280;
-    canvas.height = video.videoHeight || 720;
+    const origWidth = video.videoWidth || 1280;
+    const origHeight = video.videoHeight || 720;
+    const targetWidth = Math.min(origWidth, 1600);
+    const targetHeight = Math.round((targetWidth * origHeight) / origWidth);
+    canvas.width = targetWidth;
+    canvas.height = targetHeight;
 
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.88);
 
     setTimeout(() => {
       stopStream();

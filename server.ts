@@ -23,8 +23,30 @@ const CANDIDATE_MODELS = [
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // Middleware
-app.use(express.json({ limit: '20mb' }));
-app.use(express.urlencoded({ extended: true, limit: '20mb' }));
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
+// Helper to safely parse JSON from AI response that might contain markdown fences
+function safelyParseAiJson(rawText: string, fallbackObject: any = {}): any {
+  if (!rawText || !rawText.trim()) return fallbackObject;
+  let text = rawText.trim();
+  // Strip code block fences ```json ... ``` or ``` ... ```
+  if (text.startsWith('```')) {
+    text = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+  }
+  // If there is preamble text before the first '{', find it
+  const firstBrace = text.indexOf('{');
+  const lastBrace = text.lastIndexOf('}');
+  if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+    text = text.substring(firstBrace, lastBrace + 1);
+  }
+  try {
+    return JSON.parse(text);
+  } catch (e) {
+    console.warn('Failed to parse AI JSON:', e, 'Raw snippet:', rawText.slice(0, 100));
+    return fallbackObject;
+  }
+}
 
 // Helper to get GoogleGenAI client
 function getGenAIClient(): GoogleGenAI | null {
@@ -603,12 +625,19 @@ Hãy đọc kỹ tài liệu chứa đề toán này và trích xuất thông ti
       },
     });
 
-    const resultText = response.text;
+    const resultText = response.text || '';
     if (!resultText) {
       throw new Error('Không nhận được phản hồi từ AI');
     }
 
-    const parsed = JSON.parse(resultText);
+    const parsed = safelyParseAiJson(resultText, {
+      formattedText: 'Không thể nhận diện nội dung rõ ràng từ ảnh này. Vui lòng thử chụp lại cận cảnh và vuông góc hơn.',
+      estimatedGrade: gradeHint || 9,
+      topic: 'algebra',
+      topicLabel: 'Đại số 9',
+      isClear: false,
+      note: 'Vui lòng kiểm tra lại góc chụp.',
+    });
     res.json(parsed);
   } catch (error: any) {
     console.error('Lỗi phân tích tệp tin:', error);
@@ -1147,6 +1176,24 @@ Hãy đưa ra lời giải thích / gợi ý chuẩn mực theo mức độ ${hi
     const errInfo = formatErrorMessage(error);
     res.status(errInfo.isRateLimit ? 429 : 500).json(errInfo);
   }
+});
+
+// Global Express API Error Handler (e.g. payload too large or invalid json)
+app.use((err: any, req: Request, res: Response, next: any) => {
+  if (err) {
+    console.error('Express Error Handler:', err?.message || err);
+    if (err.type === 'entity.too.large') {
+      return res.status(413).json({
+        error: 'Tệp hoặc ảnh chụp có dung lượng quá lớn (vượt quá 50MB). Vui lòng chọn ảnh nhẹ hơn.',
+        isRateLimit: false,
+      });
+    }
+    return res.status(500).json({
+      error: err.message || 'Lỗi xử lý yêu cầu trên máy chủ',
+      isRateLimit: false,
+    });
+  }
+  next();
 });
 
 // Mount Vite middleware for dev or static files for production

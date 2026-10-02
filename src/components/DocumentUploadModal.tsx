@@ -95,7 +95,93 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
 
   if (!isOpen) return null;
 
-  const handleFile = (file: File) => {
+  // Helper to downscale and compress images before upload to avoid large payload and fast OCR
+  const prepareFileData = (file: File): Promise<{ name: string; size: number; type: string; dataBase64: string }> => {
+    return new Promise((resolve, reject) => {
+      const fileNameLower = file.name.toLowerCase();
+      const isImg = file.type.startsWith('image/') || /\.(png|jpe?g|webp|gif|bmp)$/i.test(fileNameLower);
+
+      if (!isImg) {
+        const reader = new FileReader();
+        reader.onload = () => {
+          resolve({
+            name: file.name,
+            size: file.size,
+            type: file.type || (fileNameLower.endsWith('.docx') ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' : fileNameLower.endsWith('.pdf') ? 'application/pdf' : 'application/octet-stream'),
+            dataBase64: reader.result as string,
+          });
+        };
+        reader.onerror = () => reject(new Error('Lỗi đọc tệp tin.'));
+        reader.readAsDataURL(file);
+        return;
+      }
+
+      const img = new Image();
+      const objectUrl = URL.createObjectURL(file);
+      img.onload = () => {
+        URL.revokeObjectURL(objectUrl);
+        const maxDim = 1600;
+        let { width, height } = img;
+        if (width > maxDim || height > maxDim) {
+          if (width > height) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          } else {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(0, 0, width, height);
+          ctx.drawImage(img, 0, 0, width, height);
+          const compressedBase64 = canvas.toDataURL('image/jpeg', 0.85);
+          resolve({
+            name: file.name.replace(/\.[^/.]+$/, '.jpg'),
+            size: Math.round((compressedBase64.length * 3) / 4),
+            type: 'image/jpeg',
+            dataBase64: compressedBase64,
+          });
+          return;
+        }
+
+        // Canvas context unavailable fallback
+        const reader = new FileReader();
+        reader.onload = () => {
+          resolve({
+            name: file.name,
+            size: file.size,
+            type: file.type || 'image/jpeg',
+            dataBase64: reader.result as string,
+          });
+        };
+        reader.readAsDataURL(file);
+      };
+
+      img.onerror = () => {
+        URL.revokeObjectURL(objectUrl);
+        const reader = new FileReader();
+        reader.onload = () => {
+          resolve({
+            name: file.name,
+            size: file.size,
+            type: file.type || 'image/jpeg',
+            dataBase64: reader.result as string,
+          });
+        };
+        reader.readAsDataURL(file);
+      };
+
+      img.src = objectUrl;
+    });
+  };
+
+  const handleFile = async (file: File) => {
     setError(null);
     setCountdown(0);
     const validExtensions = ['.pdf', '.docx', '.doc', '.png', '.jpg', '.jpeg', '.webp', '.txt'];
@@ -107,27 +193,19 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
       return;
     }
 
-    if (file.size > 20 * 1024 * 1024) {
-      setError('Dung lượng tệp tối đa là 20MB.');
+    if (file.size > 25 * 1024 * 1024) {
+      setError('Dung lượng tệp tối đa là 25MB.');
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      const base64 = reader.result as string;
-      const fileInfo = {
-        name: file.name,
-        size: file.size,
-        type: file.type || (fileNameLower.endsWith('.docx') ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' : fileNameLower.endsWith('.pdf') ? 'application/pdf' : 'application/octet-stream'),
-        dataBase64: base64,
-      };
+    try {
+      const fileInfo = await prepareFileData(file);
       setSelectedFile(fileInfo);
       processFile(fileInfo);
-    };
-    reader.onerror = () => {
+    } catch (err: any) {
+      console.error('File read error:', err);
       setError('Lỗi khi đọc tệp tin. Vui lòng thử lại.');
-    };
-    reader.readAsDataURL(file);
+    }
   };
 
   const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -158,7 +236,20 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
         }),
       });
 
-      const data = await res.json();
+      let data: any;
+      const contentType = res.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
+        data = await res.json();
+      } else {
+        const rawText = await res.text();
+        console.warn('Non-JSON response:', rawText.slice(0, 200));
+        throw new Error(
+          res.status === 413
+            ? 'Ảnh có kích thước quá lớn, vui lòng chụp lại hoặc chọn ảnh khác.'
+            : 'Máy chủ phản hồi không đúng định dạng. Vui lòng thử lại.'
+        );
+      }
+
       if (!res.ok) {
         if (data.isRateLimit && data.retryDelay) {
           setCountdown(data.retryDelay);
