@@ -11,8 +11,10 @@ import {
   Sparkles,
   FileCode,
   Clipboard,
+  Camera,
 } from 'lucide-react';
 import { MathView } from './MathView';
+import { CameraScannerModal } from './CameraScannerModal';
 
 interface DocumentUploadModalProps {
   isOpen: boolean;
@@ -44,8 +46,10 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
   const [editableText, setEditableText] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [countdown, setCountdown] = useState<number>(0);
+  const [isCameraOpen, setIsCameraOpen] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const cameraInputRef = useRef<HTMLInputElement | null>(null);
 
   // Countdown timer effect
   useEffect(() => {
@@ -240,6 +244,15 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
                   onChange={handleFileInputChange}
                   className="hidden"
                 />
+                <input
+                  id="mobile-camera-capture-input"
+                  ref={cameraInputRef}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  onChange={handleFileInputChange}
+                  className="hidden"
+                />
                 <div className="w-16 h-16 rounded-2xl bg-white shadow-md group-hover:scale-110 text-blue-600 flex items-center justify-center transition-transform">
                   <Upload className="w-8 h-8" />
                 </div>
@@ -263,9 +276,17 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
                   <span className="text-[11px] font-bold bg-blue-100 text-blue-800 px-2.5 py-1 rounded-lg flex items-center gap-1">
                     <FileType className="w-3.5 h-3.5" /> Word (.docx)
                   </span>
-                  <span className="text-[11px] font-bold bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded-lg flex items-center gap-1">
-                    <ImageIcon className="w-3.5 h-3.5" /> Ảnh chụp / Scan
-                  </span>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsCameraOpen(true);
+                    }}
+                    className="text-[11px] font-bold bg-emerald-100 hover:bg-emerald-200 text-emerald-900 border border-emerald-300 px-2.5 py-1 rounded-lg flex items-center gap-1 cursor-pointer transition-all shadow-2xs active:scale-95"
+                    title="Bấm để mở Camera chụp ảnh bài toán trực tiếp"
+                  >
+                    <Camera className="w-3.5 h-3.5 text-emerald-700" /> Ảnh chụp / Scan
+                  </button>
                 </div>
               </div>
 
@@ -412,6 +433,18 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
           )}
         </div>
       </div>
+
+      {/* Live Camera Scanner Viewfinder Modal */}
+      {isCameraOpen && (
+        <CameraScannerModal
+          isOpen={isCameraOpen}
+          onClose={() => setIsCameraOpen(false)}
+          onCapture={(capturedFile) => {
+            setIsCameraOpen(false);
+            handleFile(capturedFile);
+          }}
+        />
+      )}
     </div>
   );
 };
